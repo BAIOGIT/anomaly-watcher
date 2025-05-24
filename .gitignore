@@ -1,0 +1,8 @@
+# Ignore pycache in all directories
+**/__pycache__/
+
+# Ignore .env files
+.env
+
+# Ignore Poetry lock file
+*.lock

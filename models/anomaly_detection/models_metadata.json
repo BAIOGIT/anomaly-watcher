@@ -1,0 +1,72 @@
+{
+  "oven": {
+    "category": "oven",
+    "trained_at": "2025-05-24T11:43:13.506142",
+    "sensor_count": 1,
+    "sample_count": 216001,
+    "metadata": {
+      "model_type": "isolation_forest",
+      "contamination": 0.05,
+      "n_samples": 216001,
+      "n_features": 6,
+      "training_completed": true
+    },
+    "model_file": "oven_model.pkl"
+  },
+  "heater": {
+    "category": "heater",
+    "trained_at": "2025-05-24T11:43:15.753246",
+    "sensor_count": 1,
+    "sample_count": 216001,
+    "metadata": {
+      "model_type": "isolation_forest",
+      "contamination": 0.03,
+      "n_samples": 216001,
+      "n_features": 6,
+      "training_completed": true
+    },
+    "model_file": "heater_model.pkl"
+  },
+  "lamp": {
+    "category": "lamp",
+    "trained_at": "2025-05-24T11:43:17.876775",
+    "sensor_count": 1,
+    "sample_count": 216001,
+    "metadata": {
+      "model_type": "isolation_forest",
+      "contamination": 0.02,
+      "n_samples": 216001,
+      "n_features": 6,
+      "training_completed": true
+    },
+    "model_file": "lamp_model.pkl"
+  },
+  "fan": {
+    "category": "fan",
+    "trained_at": "2025-05-24T11:43:21.928495",
+    "sensor_count": 2,
+    "sample_count": 432002,
+    "metadata": {
+      "model_type": "isolation_forest",
+      "contamination": 0.04,
+      "n_samples": 432002,
+      "n_features": 6,
+      "training_completed": true
+    },
+    "model_file": "fan_model.pkl"
+  },
+  "pm": {
+    "category": "pm",
+    "trained_at": "2025-05-24T11:43:24.341196",
+    "sensor_count": 1,
+    "sample_count": 216001,
+    "metadata": {
+      "model_type": "isolation_forest",
+      "contamination": 0.08,
+      "n_samples": 216001,
+      "n_features": 6,
+      "training_completed": true
+    },
+    "model_file": "pm_model.pkl"
+  }
+}

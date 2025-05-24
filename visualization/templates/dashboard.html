@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Data Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sensor Data Dashboard</h1>
+            <div class="controls">
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="oven">Oven</option>
+                    <option value="heater">Heater</option>
+                    <option value="lamp">Lamp</option>
+                    <option value="fan">Fan</option>
+                    <option value="pm">PM Sensor</option>
+                </select>
+                <select id="timeRange">
+                    <option value="1">Last Hour</option>
+                    <option value="6">Last 6 Hours</option>
+                    <option value="24" selected>Last 24 Hours</option>
+                    <option value="72">Last 3 Days</option>
+                </select>
+                <button id="refreshBtn">Refresh</button>
+            </div>
+        </header>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Sensors</h3>
+                <span id="totalSensors">{{ statistics|length if statistics else 0 }}</span>
+            </div>
+            <div class="stat-card">
+                <h3>Active Alerts</h3>
+                <span id="activeAlerts">{{ alerts|length if alerts else 0 }}</span>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-wrapper">
+                <h2>Sensor Readings Over Time</h2>
+                <canvas id="sensorChart"></canvas>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <h2>Recent Sensor Data</h2>
+            <table id="sensorTable">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Sensor ID</th>
+                        <th>Category</th>
+                        <th>Value</th>
+                        <th>Unit</th>
+                        <th>Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for data in sensor_data[:10] %}
+                    <tr>
+                        <td>{{ data.timestamp.strftime('%Y-%m-%d %H:%M:%S') if data.timestamp else 'N/A' }}</td>
+                        <td>{{ data.sensor_id }}</td>
+                        <td>{{ data.category }}</td>
+                        <td>{{ data.value }}</td>
+                        <td>{{ data.unit }}</td>
+                        <td>{{ data.location }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if alerts %}
+        <div class="alerts-section">
+            <h2>Recent Alerts</h2>
+            <div class="alerts-list">
+                {% for alert in alerts[:5] %}
+                <div class="alert-item">
+                    <span class="alert-type">{{ alert.alert_type }}</span>
+                    <span class="alert-sensor">{{ alert.sensor_id }}</span>
+                    <span class="alert-value">{{ alert.value }} {{ alert.unit }}</span>
+                    <span class="alert-time">{{ alert.timestamp.strftime('%H:%M:%S') if alert.timestamp else 'N/A' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+</body>
+</html>
