@@ -260,3 +260,47 @@ def api_sensor_categories():
         rows = [dict(row._mapping) for row in result]
     
     return jsonify(rows)
+
+@dashboard_bp.route('/api/anomalies-timeseries')
+def api_anomalies_timeseries():
+    """API endpoint for anomaly data overlay."""
+    sensor_id = request.args.get('sensor_id')
+    category = request.args.get('category')
+    hours = request.args.get('hours', 24, type=int)
+    
+    print(f"Anomalies API called with: hours={hours}, category={category}")
+    
+    # Use direct SQL query for better performance
+    where_clause = "WHERE timestamp >= NOW() - INTERVAL %s"
+    params = [f"{hours} hours"]
+    
+    if sensor_id:
+        where_clause += " AND sensor_id = %s"
+        params.append(sensor_id)
+    elif category:
+        where_clause += " AND category = %s"
+        params.append(category)
+    
+    query = f"""
+        SELECT 
+            timestamp,
+            sensor_id,
+            category,
+            value,
+            unit,
+            location,
+            anomaly_score,
+            model_name,
+            anomaly_type
+        FROM anomalies 
+        {where_clause}
+        ORDER BY timestamp DESC
+        LIMIT 500
+    """
+    
+    with engine.connect() as conn:
+        result = conn.execute(text(query), params)
+        anomaly_data = [dict(row._mapping) for row in result]
+    
+    print(f"Returning {len(anomaly_data)} anomalies")
+    return jsonify(anomaly_data)

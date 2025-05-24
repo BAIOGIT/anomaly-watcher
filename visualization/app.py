@@ -1,6 +1,7 @@
 """Main Flask application for sensor data visualization."""
 from flask import Flask, render_template, redirect, url_for
 from .routes.dashboard import dashboard_bp
+from .routes.anomalies import anomaly_bp
 
 def create_app():
     """Create and configure Flask application."""
@@ -9,6 +10,7 @@ def create_app():
     
     # Register blueprints
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(anomaly_bp)
     
     @app.route('/')
     def index():

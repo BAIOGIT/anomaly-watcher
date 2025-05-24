@@ -14,6 +14,7 @@ from .models import IsolationForestDetector, LOFDetector, OneClassSVMDetector
 from .trainer import ModelTrainer
 from .persistence import ModelPersistence
 
+from .anomaly_service import AnomalyService
 
 class SensorAnomalyDetector:
     """Main anomaly detection class for sensor data."""
@@ -260,6 +261,25 @@ class SensorAnomalyDetector:
                         'anomaly_score': float(score),
                         'index': i
                     })
+            
+            # After detecting anomalies, log them
+            if anomalies and len(anomalies) > 0:
+                for idx, anomaly in anomalies.iterrows():
+                    AnomalyService.log_anomaly(
+                        timestamp=anomaly['timestamp'],
+                        sensor_id=sensor_id,
+                        category=category,
+                        anomaly_score=anomaly['anomaly_score'],
+                        value=anomaly['value'],
+                        unit=data['unit'].iloc[0] if 'unit' in data.columns else '',
+                        location=data['location'].iloc[0] if 'location' in data.columns else None,
+                        model_used=model_info.get('model_type', 'unknown'),
+                        context={
+                            'features': anomaly.get('features', {}),
+                            'model_version': model_info.get('version', '1.0')
+                        },
+                        db=db
+                    )
             
             return {
                 'sensor_id': sensor_id,

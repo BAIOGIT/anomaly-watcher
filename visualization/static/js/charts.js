@@ -64,11 +64,59 @@ function initializeChart() {
             plugins: {
                 legend: {
                     display: true,
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        filter: function(legendItem, chartData) {
+                            // Hide anomaly datasets from legend to reduce clutter
+                            return !legendItem.text.includes('Anomalies');
+                        }
+                    }
                 },
                 tooltip: {
-                    mode: 'index',
-                    intersect: false
+                    mode: 'nearest',
+                    intersect: false,
+                    callbacks: {
+                        title: function(context) {
+                            if (context.length > 0) {
+                                const dataPoint = context[0];
+                                return new Date(dataPoint.parsed.x).toLocaleString();
+                            }
+                            return '';
+                        },
+                        label: function(context) {
+                            const dataPoint = context.raw;
+                            const dataset = context.dataset;
+                            
+                            // Check if this is an anomaly point
+                            if (dataset.type === 'scatter' && dataPoint.anomalyScore) {
+                                return [
+                                    `🚨 ANOMALY DETECTED`,
+                                    `Sensor: ${dataPoint.sensorId}`,
+                                    `Category: ${dataPoint.category}`,
+                                    `Value: ${dataPoint.y}`,
+                                    `Location: ${dataPoint.location || 'unknown'}`,
+                                    `Anomaly Score: ${dataPoint.anomalyScore.toFixed(3)}`,
+                                    `Model: ${dataPoint.modelName}`,
+                                    `Type: ${dataPoint.anomalyType || 'unknown'}`
+                                ];
+                            } else {
+                                // Regular sensor data
+                                return `${dataset.label}: ${dataPoint.y}`;
+                            }
+                        },
+                        labelColor: function(context) {
+                            if (context.dataset.type === 'scatter') {
+                                return {
+                                    borderColor: 'rgba(255, 0, 0, 1)',
+                                    backgroundColor: 'rgba(255, 0, 0, 0.8)'
+                                };
+                            }
+                            return {
+                                borderColor: context.dataset.borderColor,
+                                backgroundColor: context.dataset.backgroundColor
+                            };
+                        }
+                    }
                 }
             }
         }
@@ -83,34 +131,49 @@ async function loadChartData() {
         const category = categoryElement ? categoryElement.value : '';
         const hours = timeRangeElement ? timeRangeElement.value : '24';
         
-        // console.log('Loading data with filters:', { category, hours });
+        // Dynamic interval based on time range
+        let interval = 60;
+        if (hours > 24) interval = 3600;
+        else if (hours > 6) interval = 900;
+        else if (hours > 2) interval = 300;
         
-        // Dynamic interval based on time range (convert to seconds)
-        let interval = 60;  // 1 minute = 60 seconds for short ranges
-        if (hours > 24) interval = 3600;     // 1 hour = 3600 seconds for longer than 1 day
-        else if (hours > 6) interval = 900;  // 15 minutes = 900 seconds for 6+ hours
-        else if (hours > 2) interval = 300;  // 5 minutes = 300 seconds for 2+ hours
+        // Build API URLs
+        let timeseriesUrl = `/api/sensor-timeseries?hours=${hours}&interval=${interval}`;
+        let anomaliesUrl = `/api/anomalies-timeseries?hours=${hours}`;
         
-        // console.log('Using interval (seconds):', interval);
-        
-        // Build API URL
-        let apiUrl = `/api/sensor-timeseries?hours=${hours}&interval=${interval}`;
         if (category) {
-            apiUrl += `&category=${category}`;
+            timeseriesUrl += `&category=${category}`;
+            anomaliesUrl += `&category=${category}`;
         }
         
-        // console.log('API URL:', apiUrl);
+        console.log('Fetching data from:', { timeseriesUrl, anomaliesUrl });
         
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        // Fetch both timeseries and anomaly data in parallel
+        const [timeseriesResponse, anomaliesResponse] = await Promise.all([
+            fetch(timeseriesUrl),
+            fetch(anomaliesUrl)
+        ]);
+        
+        if (!timeseriesResponse.ok) {
+            throw new Error(`Timeseries API error! status: ${timeseriesResponse.status}`);
+        }
+        if (!anomaliesResponse.ok) {
+            console.warn(`Anomalies API warning! status: ${anomaliesResponse.status}`);
+            // Continue without anomalies if the API fails
+            const timeseriesData = await timeseriesResponse.json();
+            updateChart(timeseriesData, []);
+            return;
         }
         
-        const data = await response.json();
-        // console.log('Received data points:', data.length);
-        // console.log('Sample data:', data.slice(0, 3));
+        const timeseriesData = await timeseriesResponse.json();
+        const anomaliesData = await anomaliesResponse.json();
         
-        updateChart(data);
+        console.log('Received data:', { 
+            timeseries: timeseriesData.length, 
+            anomalies: anomaliesData.length 
+        });
+        
+        updateChart(timeseriesData, anomaliesData);
         
     } catch (error) {
         console.error('Error loading chart data:', error);
@@ -118,12 +181,14 @@ async function loadChartData() {
     }
 }
 
-function updateChart(timeSeriesData) {
+function updateChart(timeSeriesData, anomaliesData = []) {
     if (!sensorChart) return;
 
     const groupedData = {};
+    const anomalyDatasets = {};
     let allTimestamps = [];
 
+    // Process regular time series data (line charts)
     timeSeriesData.forEach(point => {
         const timestamp = new Date(point.time_bucket);
         allTimestamps.push(timestamp);
@@ -135,7 +200,8 @@ function updateChart(timeSeriesData) {
                 borderColor: getColorForCategory(point.category),
                 backgroundColor: getColorForCategory(point.category, 0.1),
                 fill: false,
-                tension: 0.2
+                tension: 0.2,
+                type: 'line'
             };
         }
 
@@ -145,7 +211,41 @@ function updateChart(timeSeriesData) {
         });
     });
 
-    // Sort data points by time
+    // Process anomaly data (scatter points)
+    anomaliesData.forEach(anomaly => {
+        const timestamp = new Date(anomaly.timestamp);
+        const datasetKey = `${anomaly.sensor_id}_anomalies`;
+
+        if (!anomalyDatasets[datasetKey]) {
+            anomalyDatasets[datasetKey] = {
+                label: `${capitalize(anomaly.category)} Anomalies`,
+                data: [],
+                backgroundColor: 'rgba(255, 0, 0, 0.8)',
+                borderColor: 'rgba(255, 0, 0, 1)',
+                borderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                type: 'scatter',
+                showLine: false,
+                yAxisID: 'y',
+                order: 1 // Ensure anomalies are drawn on top
+            };
+        }
+
+        anomalyDatasets[datasetKey].data.push({
+            x: timestamp,
+            y: anomaly.value,
+            // Store anomaly details for tooltip
+            anomalyScore: anomaly.anomaly_score,
+            modelName: anomaly.model_name,
+            anomalyType: anomaly.anomaly_type,
+            sensorId: anomaly.sensor_id,
+            category: anomaly.category,
+            location: anomaly.location
+        });
+    });
+
+    // Sort line chart data points by time
     Object.values(groupedData).forEach(dataset => {
         dataset.data.sort((a, b) => a.x - b.x);
     });
@@ -157,10 +257,12 @@ function updateChart(timeSeriesData) {
     sensorChart.options.scales.x.min = minTime ? new Date(minTime) : undefined;
     sensorChart.options.scales.x.max = maxTime ? new Date(maxTime) : undefined;
 
-    sensorChart.data.datasets = Object.values(groupedData);
+    // Combine line charts and anomaly scatter plots
+    const allDatasets = [...Object.values(groupedData), ...Object.values(anomalyDatasets)];
+    sensorChart.data.datasets = allDatasets;
+    
     sensorChart.update();
-
-    updateStats(timeSeriesData);
+    updateStats(timeSeriesData, anomaliesData);
 }
 
 
@@ -175,9 +277,15 @@ function getColorForCategory(category, alpha = 1) {
     return colors[category] || `rgba(128, 128, 128, ${alpha})`;
 }
 
-function updateStats(data) {
+function updateStats(data, anomalies = []) {
     const uniqueSensors = new Set(data.map(d => d.sensor_id)).size;
     document.getElementById('totalSensors').textContent = uniqueSensors;
+    
+    // Update anomaly count in the existing alerts stat card
+    const alertsElement = document.getElementById('activeAlerts');
+    if (alertsElement) {
+        alertsElement.textContent = anomalies.length;
+    }
 }
 
 function showError(message) {
