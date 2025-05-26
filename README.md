@@ -25,6 +25,12 @@ The system simulates various industrial sensors commonly found in restaurants, s
 - **Fan Speed Sensors**: Analog RPM sensors (0-1000 RPM)
 - **Particulate Matter (PM) Sensors**: Serial sensors (0-36000 PM)
 
+## Dashboard Overview
+![Dashboard Overview](docs/screenshots/dashboard-overview.png)
+
+## Example anomaly popup
+![Example anomaly popup](docs/screenshots/anomaly-example.png)
+
 ## Prerequisites
 
 - Docker and Docker Compose
