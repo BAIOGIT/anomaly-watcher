@@ -1,7 +1,13 @@
 from flask import Blueprint, render_template, jsonify, request
 from sqlalchemy import text
 from datetime import datetime, timedelta
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 from database.models.base import get_db, engine
+from database.db import reset_db
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -205,7 +211,7 @@ def api_sensor_timeseries():
     else:
         interval = f"{interval_seconds} seconds"
     
-    print(f"API called with: hours={hours}, interval={interval}, category={category}")  # Debug log
+    # print(f"API called with: hours={hours}, interval={interval}, category={category}")  # Debug log
     
     timeseries_data = get_sensor_time_series(
         sensor_id=sensor_id, 
@@ -214,7 +220,7 @@ def api_sensor_timeseries():
         interval=interval
     )
     
-    print(f"Returning {len(timeseries_data)} data points")  # Debug log
+    # print(f"Returning {len(timeseries_data)} data points")  # Debug log
     return jsonify(timeseries_data)
 
 @dashboard_bp.route('/api/live-data')
@@ -267,23 +273,30 @@ def api_anomalies_timeseries():
     sensor_id = request.args.get('sensor_id')
     category = request.args.get('category')
     hours = request.args.get('hours', 24, type=int)
-    
-    print(f"Anomalies API called with: hours={hours}, category={category}")
-    
+    interval_seconds = request.args.get('interval', 300, type=int)  # Get same interval as sensor data
+
+    # Convert seconds to PostgreSQL interval format (same as sensor timeseries)
+    if interval_seconds >= 3600:
+        interval = f"{interval_seconds // 3600} hours"
+    elif interval_seconds >= 60:
+        interval = f"{interval_seconds // 60} minutes"
+    else:
+        interval = f"{interval_seconds} seconds"
+
     # Use direct SQL query for better performance
-    where_clause = "WHERE timestamp >= NOW() - INTERVAL %s"
-    params = [f"{hours} hours"]
-    
+    where_clause = "WHERE timestamp >= NOW() - INTERVAL :hours"  # timestamp is the anomaly occurrence time
+    params = {"hours": f"{hours} hours"}
+
     if sensor_id:
-        where_clause += " AND sensor_id = %s"
-        params.append(sensor_id)
+        where_clause += " AND sensor_id = :sensor_id"
+        params["sensor_id"] = sensor_id
     elif category:
-        where_clause += " AND category = %s"
-        params.append(category)
-    
+        where_clause += " AND category = :category"
+        params["category"] = category
+
     query = f"""
         SELECT 
-            timestamp,
+            date_trunc('minute', timestamp) AS timestamp,  -- Set seconds to 0
             sensor_id,
             category,
             value,
@@ -291,16 +304,40 @@ def api_anomalies_timeseries():
             location,
             anomaly_score,
             model_name,
-            anomaly_type
+            anomaly_type,
+            created_at          -- When the anomaly was detected
         FROM anomalies 
         {where_clause}
-        ORDER BY timestamp DESC
+        ORDER BY timestamp DESC  -- Order by when anomaly occurred
         LIMIT 500
     """
-    
+
     with engine.connect() as conn:
         result = conn.execute(text(query), params)
         anomaly_data = [dict(row._mapping) for row in result]
-    
-    print(f"Returning {len(anomaly_data)} anomalies")
+
     return jsonify(anomaly_data)
+
+@dashboard_bp.route('/api/reset-database', methods=['POST'])
+def api_reset_database():
+    """API endpoint to reset the database."""
+    try:
+        logger.warning("Database reset requested via dashboard")
+        
+        # Perform the reset
+        reset_db()
+        
+        logger.info("Database reset completed successfully")
+        return jsonify({
+            'success': True,
+            'message': 'Database reset successfully',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Database reset failed: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Database reset failed: {str(e)}',
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500

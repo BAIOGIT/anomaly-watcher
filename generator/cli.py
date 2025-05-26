@@ -20,43 +20,35 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Fix the import path for insert function
-try:
-    from database.operations.insert import insert_sensor_data
-except ImportError:
-    # Alternative import paths
+# If still failing, create a simple insert function
+def insert_sensor_data(readings):
+    """Fallback insert function."""
+    from database.models.base import get_db
+    from database.models.sensor_data import SensorData
+    
+    # Use next() to get the actual session from the generator
+    db = next(get_db())
     try:
-        from ..database.operations.insert import insert_sensor_data
-    except ImportError:
-        # If still failing, create a simple insert function
-        def insert_sensor_data(readings):
-            """Fallback insert function."""
-            from database.models.base import get_db
-            from database.models.sensor_data import SensorData
-            
-            # Use next() to get the actual session from the generator
-            db = next(get_db())
-            try:
-                sensor_objects = []
-                for reading in readings:
-                    sensor_obj = SensorData(
-                        sensor_id=reading['sensor_id'],
-                        timestamp=reading['timestamp'],
-                        category=reading['category'],
-                        type=reading['type'],
-                        value=reading['value'],
-                        unit=reading['unit'],
-                        location=reading['location']
-                    )
-                    sensor_objects.append(sensor_obj)
-                
-                db.add_all(sensor_objects)
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                raise e
-            finally:
-                db.close()
+        sensor_objects = []
+        for reading in readings:
+            sensor_obj = SensorData(
+                sensor_id=reading['sensor_id'],
+                timestamp=reading['timestamp'],
+                category=reading['category'],
+                type=reading['type'],
+                value=reading['value'],
+                unit=reading['unit'],
+                location=reading['location']
+            )
+            sensor_objects.append(sensor_obj)
+        
+        db.add_all(sensor_objects)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
 
 
 def generate_sample_data(

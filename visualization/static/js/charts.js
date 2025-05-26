@@ -7,19 +7,33 @@ document.addEventListener('DOMContentLoaded', function() {
     loadChartData();
     
     // Set up event listeners
-    document.getElementById('categoryFilter').addEventListener('change', loadChartData);
-
-    const timeRangeElem = document.getElementById('timeRange');
-    if (timeRangeElem) {
-        timeRangeElem.addEventListener('change', loadChartData);
-    }
-    const refreshBtnElem = document.getElementById('refreshBtn');
-    if (refreshBtnElem) {
-        refreshBtnElem.addEventListener('click', loadChartData);
+    const categoryFilter = document.getElementById('categoryFilter');
+    const timeRange = document.getElementById('timeRange');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const resetDbBtn = document.getElementById('resetDbBtn');
+    
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', loadChartData);
     }
     
+    if (timeRange) {
+        timeRange.addEventListener('change', loadChartData);
+    }
+    
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadChartData);
+    }
+    
+    // Set up reset button
+    if (resetDbBtn) {
+        resetDbBtn.addEventListener('click', showResetConfirmation);
+    }
+    
+    // Set up modal handlers
+    setupResetModal();
+    
     // Auto-refresh every 30 seconds
-    setInterval(loadChartData, 5000);
+    setInterval(loadChartData, 30000);
 });
 
 function initializeChart() {
@@ -220,10 +234,10 @@ function updateChart(timeSeriesData, anomaliesData = []) {
             anomalyDatasets[datasetKey] = {
                 label: `${capitalize(anomaly.category)} Anomalies`,
                 data: [],
-                backgroundColor: 'rgba(255, 0, 0, 0.8)',
+                backgroundColor: 'rgba(255, 0, 0, 0.08)',
                 borderColor: 'rgba(255, 0, 0, 1)',
-                borderWidth: 2,
-                pointRadius: 6,
+                borderWidth: 1,
+                pointRadius: 8,
                 pointHoverRadius: 8,
                 type: 'scatter',
                 showLine: false,
@@ -321,4 +335,117 @@ function debugTimeRange() {
     console.log('Time range element:', timeRange);
     console.log('Current value:', timeRange.value);
     console.log('All options:', Array.from(timeRange.options).map(opt => ({value: opt.value, text: opt.text, selected: opt.selected})));
+}
+
+function showResetConfirmation() {
+    const modal = document.getElementById('resetModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+function setupResetModal() {
+    const modal = document.getElementById('resetModal');
+    const confirmBtn = document.getElementById('confirmReset');
+    const cancelBtn = document.getElementById('cancelReset');
+    
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+    }
+    
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', performDatabaseReset);
+    }
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+}
+
+async function performDatabaseReset() {
+    const modal = document.getElementById('resetModal');
+    const confirmBtn = document.getElementById('confirmReset');
+    const originalText = confirmBtn.textContent;
+    
+    try {
+        // Show loading state
+        confirmBtn.innerHTML = '<span class="loading-spinner"></span>Resetting...';
+        confirmBtn.disabled = true;
+        
+        // Make API call to reset database
+        const response = await fetch('/api/reset-database', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Reset failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show success message
+        showMessage('Database reset successfully!', 'success');
+        
+        // Close modal
+        modal.style.display = 'none';
+        
+        // Refresh the chart to show empty state
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Database reset error:', error);
+        showMessage('Database reset failed: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+        confirmBtn.textContent = originalText;
+        confirmBtn.disabled = false;
+    }
+}
+
+function showMessage(message, type = 'info') {
+    // Create or update message display
+    let messageDiv = document.getElementById('messageDisplay');
+    if (!messageDiv) {
+        messageDiv = document.createElement('div');
+        messageDiv.id = 'messageDisplay';
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            z-index: 1001;
+            max-width: 400px;
+        `;
+        document.body.appendChild(messageDiv);
+    }
+    
+    // Set style based on type
+    if (type === 'success') {
+        messageDiv.style.backgroundColor = '#28a745';
+        messageDiv.textContent = '✅ ' + message;
+    } else if (type === 'error') {
+        messageDiv.style.backgroundColor = '#dc3545';
+        messageDiv.textContent = '❌ ' + message;
+    } else {
+        messageDiv.style.backgroundColor = '#17a2b8';
+        messageDiv.textContent = 'ℹ️ ' + message;
+    }
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        if (messageDiv) messageDiv.remove();
+    }, 5000);
 }

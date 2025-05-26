@@ -18,7 +18,7 @@ class AnomalyService:
     @staticmethod
     def store_anomaly(
         sensor_id: str,
-        timestamp: datetime,
+        timestamp: datetime,  # This should be the sensor reading timestamp
         anomaly_score: float,
         value: float,
         unit: str,
@@ -38,9 +38,14 @@ class AnomalyService:
             close_db = False
             
         try:
+            # Ensure timestamp is timezone-aware
+            if timestamp.tzinfo is None:
+                from datetime import timezone
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            
             anomaly = Anomaly(
                 sensor_id=sensor_id,
-                timestamp=timestamp,
+                timestamp=timestamp,  # Use the actual sensor reading timestamp
                 anomaly_score=anomaly_score,
                 value=value,
                 unit=unit,
@@ -48,7 +53,8 @@ class AnomalyService:
                 location=location,
                 model_name=model_name,
                 anomaly_type=anomaly_type,
-                context=context or {}
+                context=context or {},
+                created_at=datetime.utcnow()  # When the anomaly was detected/stored
             )
             
             db.add(anomaly)
@@ -65,7 +71,7 @@ class AnomalyService:
         finally:
             if close_db:
                 db.close()
-    
+                
     @staticmethod
     def get_anomalies(
         sensor_id: Optional[str] = None,

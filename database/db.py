@@ -35,22 +35,33 @@ def init_db():
     except SQLAlchemyError as e:
         logger.error(f"Error initializing database: {e}")
         raise
-
+    
 def reset_db():
     """Drop all tables and recreate them."""
     try:
-        logger.warning("Dropping all tables...")
+        logger.warning("🚨 RESETTING DATABASE - ALL DATA WILL BE LOST!")
+        
         with engine.connect() as conn:
-            # Drop tables in the correct order
-            conn.execute(text('DROP TABLE IF EXISTS anomaly_detections CASCADE'))
+            # Drop tables in the correct order to avoid foreign key issues
+            logger.info("Dropping anomalies table...")
+            conn.execute(text('DROP TABLE IF EXISTS anomalies CASCADE'))
+            
+            logger.info("Dropping sensors_data table...")
             conn.execute(text('DROP TABLE IF EXISTS sensors_data CASCADE'))
+            
+            # Drop any other tables that might exist
+            conn.execute(text('DROP TABLE IF EXISTS anomaly_detections CASCADE'))
+            
             conn.commit()
         
-        logger.info("Recreating database...")
+        logger.info("Recreating database schema...")
         init_db()
-        logger.info("Database reset successfully!")
+        
+        logger.info("✅ Database reset completed successfully!")
+        return True
+        
     except SQLAlchemyError as e:
-        logger.error(f"Error resetting database: {e}")
+        logger.error(f"❌ Error resetting database: {e}")
         raise
 
 if __name__ == "__main__":

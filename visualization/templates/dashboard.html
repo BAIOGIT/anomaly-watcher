@@ -13,6 +13,7 @@
     <div class="container">
         <header>
             <h1>Sensor Data Dashboard</h1>
+            <!-- Add the reset button with warning styling -->
             <div class="controls">
                 <select id="categoryFilter">
                     <option value="">All Categories</option>
@@ -23,14 +24,21 @@
                     <option value="pm">PM Sensor</option>
                 </select>
                 <select id="timeRange">
-                    <option value="1">Last Hour</option>
+                    <option value="1" selected>Last Hour</option>
                     <option value="6">Last 6 Hours</option>
-                    <option value="24" selected>Last 24 Hours</option>
+                    <option value="24">Last 24 Hours</option>
                     <option value="72">Last 3 Days</option>
                 </select>
                 <button id="refreshBtn">Refresh</button>
             </div>
         </header>
+
+        <div style="margin-bottom: 20px;">
+            <button id="resetDbBtn" class="danger-btn" style="margin-left: 0px;" title="Reset Database - This will delete all data!">
+                🗑️ Reset DB
+            </button>
+        </div>
+
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>Total Sensors</h3>
@@ -77,21 +85,44 @@
             </table>
         </div>
 
-        {% if alerts %}
-        <div class="alerts-section">
-            <h2>Recent Alerts</h2>
-            <div class="alerts-list">
-                {% for alert in alerts[:5] %}
-                <div class="alert-item">
-                    <span class="alert-type">{{ alert.alert_type }}</span>
-                    <span class="alert-sensor">{{ alert.sensor_id }}</span>
-                    <span class="alert-value">{{ alert.value }} {{ alert.unit }}</span>
-                    <span class="alert-time">{{ alert.timestamp.strftime('%H:%M:%S') if alert.timestamp else 'N/A' }}</span>
+        <div class="data-table">
+            <h2>Sensors Statistics</h2>
+            <table id="statisticsTable">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Average Value</th>
+                        <th>Max Value</th>
+                        <th>Min Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in statistics %}
+                    <tr>
+                        <td>{{ stat.type }}</td>
+                        <td>{{ stat.category }}</td>
+                        <td>{{ stat.avg_value }}</td>
+                        <td>{{ stat.max_value }}</td>
+                        <td>{{ stat.min_value }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+        <div id="resetModal" class="modal">
+            <div class="modal-content">
+                <h3>⚠️ Reset Database</h3>
+                <p>This action will permanently delete all sensor data and anomalies from the database.</p>
+                <p><strong>This cannot be undone!</strong></p>
+                <div class="modal-buttons">
+                    <button id="confirmReset" class="confirm-btn">Yes, Reset Database</button>
+                    <button id="cancelReset" class="cancel-btn">Cancel</button>
                 </div>
-                {% endfor %}
             </div>
         </div>
-        {% endif %}
+
     </div>
 
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
